@@ -19,7 +19,7 @@ CLI interativa para automação de tarefas AWS com suporte a SSO.
 ### Opção 1: Clone do repositório
 
 ```bash
-git clone https://github.com/SEU_USUARIO/aws-cli-tool.git
+git clone https://github.com/Lucasliuzao/aws-cli-tool.git
 cd aws-cli-tool
 
 # Criar virtual environment
@@ -38,7 +38,7 @@ sudo apt install pipx
 pipx ensurepath
 
 # Instalar direto do GitHub
-pipx install git+https://github.com/SEU_USUARIO/aws-cli-tool.git
+pipx install git+https://github.com/Lucasliuzao/aws-cli-tool.git
 ```
 
 ## Uso
@@ -94,7 +94,7 @@ aws-cli-tool/
 
 ```bash
 # Clonar e instalar em modo dev
-git clone https://github.com/SEU_USUARIO/aws-cli-tool.git
+git clone https://github.com/Lucasliuzao/aws-cli-tool.git
 cd aws-cli-tool
 python3 -m venv .venv
 source .venv/bin/activate
