@@ -81,6 +81,67 @@ def run_ecs_wizard(profile: str):
             return "exit"
 
 
+def run_ec2_wizard(profile: str):
+    """Run the EC2 interactive wizard."""
+    from awscli_tool.commands.ec2 import list_instances, display_instances_table, get_instance_details, interactive_menu
+    from awscli_tool.utils.aws_client import get_client
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    
+    ec2_client = get_client("ec2", profile)
+    
+    while True:
+        # Filter selection
+        filter_choice = inquirer.select(
+            message="🔍 Filtrar instâncias por estado:",
+            choices=[
+                {"name": "Todas", "value": "all"},
+                {"name": "🟢 Running", "value": "running"},
+                {"name": "🔴 Stopped", "value": "stopped"},
+                {"name": "◀️  Voltar ao menu principal", "value": "back"},
+            ],
+        ).execute()
+        
+        if filter_choice == "back":
+            return
+        
+        # List instances
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            progress.add_task("Carregando instâncias...", total=None)
+            instances = list_instances(ec2_client, filter_choice)
+        
+        if not instances:
+            console.print(f"[yellow]⚠ Nenhuma instância encontrada com filtro '{filter_choice}'[/yellow]")
+            continue
+        
+        # Display table
+        display_instances_table(instances)
+        
+        # Select instance
+        instance_choices = [
+            {"name": f"{inst['name']} ({inst['id']}) - {inst['state']}", "value": inst}
+            for inst in instances
+        ]
+        instance_choices.append({"name": "◀️  Voltar", "value": None})
+        
+        selected = inquirer.select(
+            message="🖥️  Selecione uma instância:",
+            choices=instance_choices,
+        ).execute()
+        
+        if selected is None:
+            continue
+        
+        # Show interactive menu for this instance
+        result = interactive_menu(ec2_client, selected)
+        
+        if result == "exit":
+            return "exit"
+
+
 def run_apigw_wizard(profile: str):
     """Run the API Gateway interactive wizard."""
     from awscli_tool.commands.apigateway import list_apis, list_routes, select_api
@@ -238,6 +299,7 @@ def main(
             message="🎯 O que deseja gerenciar?",
             choices=[
                 {"name": "📦 ECS (Clusters, Services, Tasks, Logs)", "value": "ecs"},
+                {"name": "🖥️  EC2 (Instâncias)", "value": "ec2"},
                 {"name": "🌐 API Gateway (APIs, Rotas)", "value": "apigw"},
                 {"name": "📋 Ver profiles configurados", "value": "profiles"},
                 {"name": "🔄 Trocar profile", "value": "switch"},
@@ -247,6 +309,11 @@ def main(
         
         if action == "ecs":
             result = run_ecs_wizard(selected_profile)
+            if result == "exit":
+                break
+        
+        elif action == "ec2":
+            result = run_ec2_wizard(selected_profile)
             if result == "exit":
                 break
                 
@@ -281,8 +348,9 @@ def main(
 
 
 # Register subcommands (for direct command usage)
-from awscli_tool.commands import ecs, apigateway
+from awscli_tool.commands import ecs, apigateway, ec2
 app.add_typer(ecs.app, name="ecs", help="Comandos para Amazon ECS")
+app.add_typer(ec2.app, name="ec2", help="Comandos para Amazon EC2")
 app.add_typer(apigateway.app, name="apigw", help="Comandos para API Gateway")
 
 
