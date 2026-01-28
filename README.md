@@ -7,6 +7,7 @@ CLI interativa para automação de tarefas AWS com suporte a SSO.
 - 🔐 **Seletor de profiles SSO** - Menu interativo para escolher entre seus profiles
 - 📦 **ECS Manager** - Ver logs, tasks, forçar deploys
 - 🖥️ **EC2 Manager** - Listar, iniciar, parar, reiniciar instâncias
+- 🏗️ **Service Catalog** - Provisionar produtos, gerenciar provisionados
 - 🌐 **API Gateway** - Listar e criar rotas
 - 🎨 **Interface rica** - Tabelas coloridas, JSON highlighting
 
@@ -79,6 +80,14 @@ aws-tool ec2 start -i i-0123456789   # Iniciar instância
 aws-tool ec2 stop -i i-0123456789    # Parar instância
 aws-tool ec2 reboot -i i-0123456789  # Reiniciar instância
 
+# Service Catalog
+aws-tool sc                          # Modo interativo
+aws-tool sc products                 # Listar produtos
+aws-tool sc provisioned              # Listar provisionados
+aws-tool sc launch                   # Lançar (vai pedir parâmetros interativamente)
+aws-tool sc terminate --pp-id ID     # Terminar provisionamento
+aws-tool sc status --pp-id ID        # Ver status detalhado
+
 # API Gateway
 aws-tool apigw apis
 aws-tool apigw list --api-id abc123
@@ -97,6 +106,7 @@ aws-cli-tool/
     ├── commands/
     │   ├── ecs.py        # Comandos ECS
     │   ├── ec2.py        # Comandos EC2
+    │   ├── servicecatalog.py # Comandos Service Catalog
     │   └── apigateway.py # Comandos API Gateway
     └── utils/
         ├── aws_client.py    # Factory boto3

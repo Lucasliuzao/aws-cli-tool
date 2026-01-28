@@ -142,6 +142,110 @@ def run_ec2_wizard(profile: str):
             return "exit"
 
 
+def run_servicecatalog_wizard(profile: str):
+    """Run the Service Catalog interactive wizard."""
+    from awscli_tool.commands.servicecatalog import (
+        list_products, list_provisioned_products, display_products_table,
+        display_provisioned_table, provision_product_action, interactive_provisioned_menu
+    )
+    from awscli_tool.utils.aws_client import get_client
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    
+    sc_client = get_client("servicecatalog", profile)
+    
+    while True:
+        action = inquirer.select(
+            message="🏗️  O que deseja fazer?",
+            choices=[
+                {"name": "📦 Ver produtos disponíveis", "value": "products"},
+                {"name": "📋 Ver produtos provisionados", "value": "provisioned"},
+                {"name": "🚀 Provisionar novo produto", "value": "launch"},
+                {"name": "◀️  Voltar ao menu principal", "value": "back"},
+            ],
+        ).execute()
+        
+        if action == "products":
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                progress.add_task("Carregando produtos...", total=None)
+                products = list_products(sc_client)
+            
+            if products:
+                display_products_table(products)
+            else:
+                console.print("[yellow]⚠ Nenhum produto encontrado[/yellow]")
+            
+            inquirer.confirm(message="Pressione Enter para continuar...", default=True).execute()
+            
+        elif action == "provisioned":
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                progress.add_task("Carregando provisionados...", total=None)
+                provisioned = list_provisioned_products(sc_client)
+            
+            if not provisioned:
+                console.print("[yellow]⚠ Nenhum produto provisionado[/yellow]")
+                inquirer.confirm(message="Pressione Enter para continuar...", default=True).execute()
+                continue
+            
+            display_provisioned_table(provisioned)
+            
+            pp_choices = [
+                {"name": f"{pp['name']} ({pp['status']})", "value": pp}
+                for pp in provisioned
+            ]
+            pp_choices.append({"name": "◀️  Voltar", "value": None})
+            
+            selected_pp = inquirer.select(
+                message="📦 Selecione um produto:",
+                choices=pp_choices,
+            ).execute()
+            
+            if selected_pp:
+                result = interactive_provisioned_menu(sc_client, selected_pp)
+                if result == "exit":
+                    return "exit"
+            
+        elif action == "launch":
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                progress.add_task("Carregando produtos...", total=None)
+                products = list_products(sc_client)
+            
+            if not products:
+                console.print("[yellow]⚠ Nenhum produto disponível[/yellow]")
+                continue
+            
+            display_products_table(products)
+            
+            product_choices = [
+                {"name": f"{p['name']}", "value": p}
+                for p in products
+            ]
+            product_choices.append({"name": "◀️  Cancelar", "value": None})
+            
+            selected_product = inquirer.select(
+                message="🚀 Selecione o produto:",
+                choices=product_choices,
+            ).execute()
+            
+            if selected_product:
+                provision_product_action(sc_client, selected_product)
+                inquirer.confirm(message="Pressione Enter para continuar...", default=True).execute()
+            
+        elif action == "back":
+            return
+
+
 def run_apigw_wizard(profile: str):
     """Run the API Gateway interactive wizard."""
     from awscli_tool.commands.apigateway import list_apis, list_routes, select_api
@@ -300,6 +404,7 @@ def main(
             choices=[
                 {"name": "📦 ECS (Clusters, Services, Tasks, Logs)", "value": "ecs"},
                 {"name": "🖥️  EC2 (Instâncias)", "value": "ec2"},
+                {"name": "🏗️  Service Catalog (Products)", "value": "sc"},
                 {"name": "🌐 API Gateway (APIs, Rotas)", "value": "apigw"},
                 {"name": "📋 Ver profiles configurados", "value": "profiles"},
                 {"name": "🔄 Trocar profile", "value": "switch"},
@@ -314,6 +419,11 @@ def main(
         
         elif action == "ec2":
             result = run_ec2_wizard(selected_profile)
+            if result == "exit":
+                break
+        
+        elif action == "sc":
+            result = run_servicecatalog_wizard(selected_profile)
             if result == "exit":
                 break
                 
@@ -348,9 +458,10 @@ def main(
 
 
 # Register subcommands (for direct command usage)
-from awscli_tool.commands import ecs, apigateway, ec2
+from awscli_tool.commands import ecs, apigateway, ec2, servicecatalog
 app.add_typer(ecs.app, name="ecs", help="Comandos para Amazon ECS")
 app.add_typer(ec2.app, name="ec2", help="Comandos para Amazon EC2")
+app.add_typer(servicecatalog.app, name="sc", help="Comandos para Service Catalog")
 app.add_typer(apigateway.app, name="apigw", help="Comandos para API Gateway")
 
 
