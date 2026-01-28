@@ -53,6 +53,7 @@ def list_products(sc_client) -> list[dict]:
     except Exception as e:
         console.print(f"[red]Erro ao listar produtos: {e}[/red]")
     
+    products.sort(key=lambda x: x["name"].lower())
     return products
 
 
@@ -147,6 +148,7 @@ def list_provisioned_products(sc_client) -> list[dict]:
     except Exception as e:
         console.print(f"[red]Erro ao listar provisionados: {e}[/red]")
     
+    products.sort(key=lambda x: x["name"].lower())
     return products
 
 
@@ -574,9 +576,12 @@ def sc_wizard(
             ]
             pp_choices.append({"name": "◀️  Voltar", "value": None})
             
-            selected_pp = inquirer.select(
+            selected_pp = inquirer.fuzzy(
                 message="📦 Selecione um produto provisionado:",
+                instruction="[Digite para filtrar]",
                 choices=pp_choices,
+                max_height="70%",
+                multiselect=False,
             ).execute()
             
             if selected_pp:
