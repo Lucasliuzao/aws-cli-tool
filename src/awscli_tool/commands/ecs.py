@@ -55,13 +55,14 @@ def get_tasks(ecs_client, cluster: str, service: str) -> list[dict]:
     return tasks_response.get("tasks", [])
 
 
-def get_log_group_for_service(ecs_client, cluster: str, service: str) -> Optional[str]:
-    """Get the CloudWatch log group for a service's task definition."""
+def get_container_log_groups(ecs_client, cluster: str, service: str) -> dict[str, str]:
+    """Get CloudWatch log groups for all containers in the service."""
+    log_groups = {}
     try:
         service_response = ecs_client.describe_services(cluster=cluster, services=[service])
         
         if not service_response["services"]:
-            return None
+            return {}
         
         task_def_arn = service_response["services"][0]["taskDefinition"]
         task_def = ecs_client.describe_task_definition(taskDefinition=task_def_arn)
@@ -73,12 +74,12 @@ def get_log_group_for_service(ecs_client, cluster: str, service: str) -> Optiona
                 options = log_config.get("options", {})
                 log_group = options.get("awslogs-group")
                 if log_group:
-                    return log_group
+                    log_groups[container["name"]] = log_group
         
-        return None
+        return log_groups
     except Exception as e:
-        console.print(f"[red]Erro ao obter log group: {e}[/red]")
-        return None
+        console.print(f"[red]Erro ao obter log groups: {e}[/red]")
+        return {}
 
 
 def display_service_info(service_details: dict, tasks: list[dict]):
@@ -117,12 +118,37 @@ def view_logs_action(ecs_client, logs_client, cluster: str, service: str):
         console=console,
     ) as progress:
         progress.add_task("Buscando configuração de logs...", total=None)
-        log_group = get_log_group_for_service(ecs_client, cluster, service)
+        log_groups = get_container_log_groups(ecs_client, cluster, service)
     
-    if not log_group:
-        console.print("[red]❌ Não foi possível encontrar o log group[/red]")
+    if not log_groups:
+        console.print("[red]❌ Nenhum log group configurado (awslogs) encontrado.[/red]")
         return
     
+    # Select container if multiple
+    log_group = None
+    if len(log_groups) == 1:
+        log_group = list(log_groups.values())[0]
+        container_name = list(log_groups.keys())[0]
+    else:
+        # Check if there is a container with the same name as service
+        default_container = None
+        if service in log_groups:
+            default_container = service
+            
+        choices = [{"name": f"{name} ({group})", "value": group} for name, group in log_groups.items()]
+        
+        # Sort choices to put service-named container first
+        if default_container:
+           choices.sort(key=lambda x: 0 if service in x["name"] else 1)
+        
+        log_group = inquirer.select(
+            message="Selecione o container:",
+            choices=choices,
+        ).execute()
+        
+        # Find container name back from log_group for display
+        container_name = next((name for name, group in log_groups.items() if group == log_group), "unknown")
+
     # Ask how many lines
     tail = inquirer.number(
         message="Quantas linhas de log?",
@@ -142,6 +168,7 @@ def view_logs_action(ecs_client, logs_client, cluster: str, service: str):
         ],
     ).execute()
     
+    console.print(f"[dim]Container: {container_name}[/dim]")
     console.print(f"[dim]Log group: {log_group}[/dim]\n")
     
     try:
@@ -436,10 +463,31 @@ def view_logs(
         services = list_services(ecs_client, cluster)
         service = inquirer.select(message="🔧 Service:", choices=services).execute()
     
-    log_group = get_log_group_for_service(ecs_client, cluster, service)
-    if not log_group:
-        console.print("[red]❌ Log group não encontrado[/red]")
+    log_groups = get_container_log_groups(ecs_client, cluster, service)
+    if not log_groups:
+        console.print("[red]❌ Log groups não encontrados[/red]")
         raise typer.Exit(1)
+    
+    log_group = None
+    if len(log_groups) == 1:
+        log_group = list(log_groups.values())[0]
+    elif service in log_groups:
+         # Try to match service name directly
+         log_group = log_groups[service]
+    else:
+        # Fallback to first one or ask user? In non-interactive mode (direct command), 
+        # it's better to pick one or require a flag. For now, let's pick the first one 
+        # but warn, or use interactive select if possible?
+        # Since this is the direct command, let's just pick the first one matching 'app' or similar if possible,
+        # otherwise just interactive select if input is available?
+        # Better approach for direct command: interactively ask if multiple and no specific flag (not implemented yet).
+        # Reuse the logic of prioritization:
+        console.print("[yellow]⚠ Múltiplos containers encontrados. Use o modo interativo para selecionar.[/yellow]")
+        # Pick the one that matches service name if exists (already checked above), 
+        # else pick the first one.
+        log_group = list(log_groups.values())[0]
+        console.print(f"[dim]Selecionando automaticamente o primeiro: {list(log_groups.keys())[0]}[/dim]")
+
     
     response = logs_client.filter_log_events(logGroupName=log_group, limit=tail, interleaved=True)
     events = response.get("events", [])
