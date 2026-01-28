@@ -492,9 +492,11 @@ def ecs_wizard(
         service_choices.append({"name": "◀️  Voltar", "value": "back"})
 
         service = inquirer.fuzzy(
-            message="🔧 Selecione o service (digite para filtrar):",
+            message="🔧 Selecione o service:",
+            instruction="[Digite para filtrar]",
             choices=service_choices,
             max_height="70%",
+            multiselect=False,
         ).execute()
 
         if service == "back":
