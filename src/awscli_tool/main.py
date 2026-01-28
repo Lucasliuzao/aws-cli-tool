@@ -364,6 +364,17 @@ def run_apigw_wizard(profile: str):
                 return "exit"
 
 
+def run_cost_wizard(profile: str):
+    """Run the Cost & FinOps interactive wizard."""
+    from awscli_tool.commands.cost import interactive_cost_menu
+    from awscli_tool.utils.aws_client import get_client
+    
+    ce_client = get_client("ce", profile)
+    ec2_client = get_client("ec2", profile)
+    
+    interactive_cost_menu(ce_client, ec2_client)
+
+
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
@@ -406,6 +417,7 @@ def main(
                 {"name": "🖥️  EC2 (Instâncias)", "value": "ec2"},
                 {"name": "🏗️  Service Catalog (Products)", "value": "sc"},
                 {"name": "🌐 API Gateway (APIs, Rotas)", "value": "apigw"},
+                {"name": "💰 Cost & FinOps", "value": "cost"},
                 {"name": "📋 Ver profiles configurados", "value": "profiles"},
                 {"name": "🔄 Trocar profile", "value": "switch"},
                 {"name": "❌ Sair", "value": "exit"},
@@ -429,6 +441,11 @@ def main(
                 
         elif action == "apigw":
             result = run_apigw_wizard(selected_profile)
+            if result == "exit":
+                break
+                
+        elif action == "cost":
+            result = run_cost_wizard(selected_profile)
             if result == "exit":
                 break
                 
@@ -463,6 +480,9 @@ app.add_typer(ecs.app, name="ecs", help="Comandos para Amazon ECS")
 app.add_typer(ec2.app, name="ec2", help="Comandos para Amazon EC2")
 app.add_typer(servicecatalog.app, name="sc", help="Comandos para Service Catalog")
 app.add_typer(apigateway.app, name="apigw", help="Comandos para API Gateway")
+
+from awscli_tool.commands import cost
+app.add_typer(cost.app, name="cost", help="Comandos para Cost Explorer e FinOps")
 
 
 @app.command("profiles")
