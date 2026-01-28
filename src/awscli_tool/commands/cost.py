@@ -93,7 +93,79 @@ def check_instances_stopped(ec2_client) -> list[dict]:
     return instances
 
 
-def interactive_cost_menu(ce_client, ec2_client):
+def check_rds_stopped(rds_client) -> list[dict]:
+    """Find stopped RDS instances."""
+    try:
+        response = rds_client.describe_db_instances()
+        stopped = []
+        for db in response.get("DBInstances", []):
+            if db["DBInstanceStatus"] == "stopped":
+                stopped.append(db)
+        return stopped
+    except Exception:
+        return []
+
+
+def check_elb_unused(elbv2_client) -> list[dict]:
+    """Find unused Application Load Balancers (no targets)."""
+    unused = []
+    try:
+        # List Load Balancers
+        paginator = elbv2_client.get_paginator("describe_load_balancers")
+        lbs = []
+        for page in paginator.paginate():
+            lbs.extend(page["LoadBalancers"])
+            
+        for lb in lbs:
+            lb_arn = lb["LoadBalancerArn"]
+            
+            # Check Target Groups
+            tg_resp = elbv2_client.describe_target_groups(LoadBalancerArn=lb_arn)
+            target_groups = tg_resp.get("TargetGroups", [])
+            
+            if not target_groups:
+                unused.append(lb)
+                continue
+                
+            # Check if Target Groups have healthy targets
+            has_targets = False
+            for tg in target_groups:
+                tg_arn = tg["TargetGroupArn"]
+                health = elbv2_client.describe_target_health(TargetGroupArn=tg_arn)
+                # If any target is registered (healthy or not), we consider it "in use" loosely.
+                # Strictly, we might want to check for healthy only, but let's be conservative.
+                if health.get("TargetHealthDescriptions"):
+                    has_targets = True
+                    break
+            
+            if not has_targets:
+                unused.append(lb)
+                
+        return unused
+    except Exception:
+        return []
+
+
+def check_old_snapshots(ec2_client, days=90) -> list[dict]:
+    """Find snapshots older than N days."""
+    try:
+        date_threshold = datetime.now(datetime.timezone.utc) - timedelta(days=days)
+        response = ec2_client.describe_snapshots(OwnerIds=["self"])
+        old_snapshots = []
+        
+        for snap in response.get("Snapshots", []):
+            start_time = snap["StartTime"]
+            if start_time < date_threshold:
+                old_snapshots.append(snap)
+                
+        # Sort by age (oldest first)
+        old_snapshots.sort(key=lambda x: x["StartTime"])
+        return old_snapshots
+    except Exception:
+        return []
+
+
+def interactive_cost_menu(ce_client, ec2_client, rds_client, elbv2_client):
     """Show interactive cost menu."""
     while True:
         action = inquirer.select(
@@ -182,6 +254,9 @@ def interactive_cost_menu(ce_client, ec2_client):
                 unused_ebs = check_ebs_unused(ec2_client)
                 unused_eip = check_eip_unused(ec2_client)
                 stopped_ec2 = check_instances_stopped(ec2_client)
+                stopped_rds = check_rds_stopped(rds_client)
+                unused_elb = check_elb_unused(elbv2_client)
+                old_snapshots = check_old_snapshots(ec2_client)
             
             console.print("\n[bold]💡 Recomendações de Otimização[/bold]\n")
             
@@ -201,8 +276,6 @@ def interactive_cost_menu(ce_client, ec2_client):
                     )
                 console.print(table)
                 console.print("[dim]Ação sugerida: Deletar volumes se não precisar dos dados (Snapshot antes se necessário).[/dim]\n")
-            else:
-                console.print("[green]✓ Nenhum volume EBS solto encontrado.[/green]")
 
             # EIP
             if unused_eip:
@@ -213,8 +286,6 @@ def interactive_cost_menu(ce_client, ec2_client):
                     table.add_row(eip["PublicIp"], eip["AllocationId"])
                 console.print(table)
                 console.print("[dim]Ação sugerida: Liberar (Release) IPs não utilizados.[/dim]\n")
-            else:
-                console.print("[green]✓ Nenhum Elastic IP ocioso encontrado.[/green]")
 
             # Stopped Instances
             if stopped_ec2:
@@ -230,8 +301,65 @@ def interactive_cost_menu(ce_client, ec2_client):
                     )
                 console.print(table)
                 console.print("[dim]Ação sugerida: Terminar se não forem mais necessárias ou criar AMI e terminar.[/dim]\n")
-            else:
-                console.print("[green]✓ Nenhuma instância parada encontrada.[/green]")
+            
+            # RDS Stopped
+            if stopped_rds:
+                table = Table(title=f"🛢️ RDS Parados ({len(stopped_rds)})", border_style="yellow")
+                table.add_column("ID")
+                table.add_column("Engine")
+                table.add_column("Type")
+                for db in stopped_rds:
+                    table.add_row(
+                        db["DBInstanceIdentifier"],
+                        db["Engine"],
+                        db["DBInstanceClass"]
+                    )
+                console.print(table)
+                console.print("[dim]Ação sugerida: Terminar/Snapshot. Storage é cobrado mesmo parado.[/dim]\n")
+                
+            # Unused ELB
+            if unused_elb:
+                table = Table(title=f"⚖️ Load Balancers Vazios ({len(unused_elb)})", border_style="red")
+                table.add_column("Name")
+                table.add_column("DNS Name")
+                table.add_column("Created")
+                for lb in unused_elb:
+                    table.add_row(
+                        lb["LoadBalancerName"],
+                        lb["DNSName"][:30] + "...",
+                        lb["CreatedTime"].strftime("%Y-%m-%d")
+                    )
+                console.print(table)
+                console.print("[dim]Ação sugerida: Deletar LB. Cobra hora de operação mínima.[/dim]\n")
+                
+            # Old Snapshots
+            if old_snapshots:
+                limit = 10
+                total_snaps = len(old_snapshots)
+                shown_snaps = old_snapshots[:limit]
+                
+                table = Table(title=f"📸 Snapshots Antigos >90d ({total_snaps})", border_style="blue")
+                table.add_column("ID")
+                table.add_column("Size (GB)")
+                table.add_column("Date")
+                table.add_column("Description")
+                for snap in shown_snaps:
+                    desc = snap.get("Description", "")
+                    if len(desc) > 30:
+                        desc = desc[:30] + "..."
+                    table.add_row(
+                        snap["SnapshotId"],
+                        str(snap["VolumeSize"]),
+                        snap["StartTime"].strftime("%Y-%m-%d"),
+                        desc
+                    )
+                console.print(table)
+                if total_snaps > limit:
+                     console.print(f"[dim]... e mais {total_snaps - limit} snapshots antigos.[/dim]")
+                console.print("[dim]Ação sugerida: Revisar e deletar backups obsoletos.[/dim]\n")
+
+            if not any([unused_ebs, unused_eip, stopped_ec2, stopped_rds, unused_elb, old_snapshots]):
+                 console.print("[green]✨ Parabéns! Nenhum recurso ocioso óbvio encontrado.[/green]")
                 
             inquirer.confirm(message="Continuar...", default=True).execute()
 
@@ -262,6 +390,8 @@ def cost_wizard(
         
     ce_client = get_client("ce", selected_profile)
     ec2_client = get_client("ec2", selected_profile)
+    rds_client = get_client("rds", selected_profile)
+    elbv2_client = get_client("elbv2", selected_profile)
     
-    interactive_cost_menu(ce_client, ec2_client)
+    interactive_cost_menu(ce_client, ec2_client, rds_client, elbv2_client)
 

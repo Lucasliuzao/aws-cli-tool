@@ -8,6 +8,7 @@ CLI interativa para automação de tarefas AWS com suporte a SSO.
 - 📦 **ECS Manager** - Ver logs, tasks, forçar deploys
 - 🖥️ **EC2 Manager** - Listar, iniciar, parar, reiniciar instâncias
 - 🏗️ **Service Catalog** - Provisionar produtos, gerenciar provisionados
+- 💰 **Cost & FinOps** - Resumo de custos e recomendações de recursos ociosos (RDS, EBS, ELB, etc)
 - 🌐 **API Gateway** - Listar e criar rotas
 - 🎨 **Interface rica** - Tabelas coloridas, JSON highlighting
 
@@ -87,6 +88,11 @@ aws-tool sc provisioned              # Listar provisionados
 aws-tool sc launch                   # Lançar (vai pedir parâmetros interativamente)
 aws-tool sc terminate --pp-id ID     # Terminar provisionamento
 aws-tool sc status --pp-id ID        # Ver status detalhado
+
+# Cost & FinOps
+aws-tool cost                        # Modo interativo (Resumo, Top Services, Recomendações)
+aws-tool cost -p meu-profile         # Rodar direto em um profile
+
 
 # API Gateway
 aws-tool apigw apis

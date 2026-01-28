@@ -371,8 +371,10 @@ def run_cost_wizard(profile: str):
     
     ce_client = get_client("ce", profile)
     ec2_client = get_client("ec2", profile)
+    rds_client = get_client("rds", profile)
+    elbv2_client = get_client("elbv2", profile)
     
-    interactive_cost_menu(ce_client, ec2_client)
+    interactive_cost_menu(ce_client, ec2_client, rds_client, elbv2_client)
 
 
 @app.callback(invoke_without_command=True)
