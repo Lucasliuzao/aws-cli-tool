@@ -526,5 +526,33 @@ def list_profiles():
     console.print(table)
 
 
+@app.command("debug-fuzzy", hidden=True)
+def debug_fuzzy():
+    """Debug fuzzy search environment."""
+    from InquirerPy import inquirer
+    console.print("[bold]Teste de Fuzzy Search (In-App)[/bold]")
+    console.print("Tente digitar 'ba' para filtrar 'banana'...")
+    
+    try:
+        choices = [
+            {"name": "Apples", "value": "apple"},
+            {"name": "Bananas", "value": "banana"},
+            {"name": "Cherries", "value": "cherry"},
+        ]
+        
+        result = inquirer.fuzzy(
+            message="Selecione uma fruta:",
+            instruction="[Digite para filtrar]",
+            choices=choices,
+            multiselect=False,
+            max_height="70%",
+        ).execute()
+        
+        console.print(f"Selecionado: {result}")
+
+    except Exception as e:
+        console.print(f"[red]Erro: {e}[/red]")
+
+
 if __name__ == "__main__":
     app()
