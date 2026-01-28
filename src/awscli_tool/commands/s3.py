@@ -247,7 +247,7 @@ def interactive_s3_browser(s3_client):
             action = inquirer.select(
                 message=f"Arquivo: {key.split('/')[-1]}",
                 choices=[
-                    {"name": "⬇️  Download", "value": "download"},
+                    {"name": "⬇️ Download", "value": "download"},
                     {"name": "❌ Cancelar", "value": "cancel"},
                 ]
             ).execute()

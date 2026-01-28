@@ -97,7 +97,7 @@ def run_ec2_wizard(profile: str):
                 {"name": "Todas", "value": "all"},
                 {"name": "🟢 Running", "value": "running"},
                 {"name": "🔴 Stopped", "value": "stopped"},
-                {"name": "◀️  Voltar ao menu principal", "value": "back"},
+                {"name": "◀️ Voltar ao menu principal", "value": "back"},
             ],
         ).execute()
         
@@ -160,7 +160,7 @@ def run_servicecatalog_wizard(profile: str):
                 {"name": "📦 Ver produtos disponíveis", "value": "products"},
                 {"name": "📋 Ver produtos provisionados", "value": "provisioned"},
                 {"name": "🚀 Provisionar novo produto", "value": "launch"},
-                {"name": "◀️  Voltar ao menu principal", "value": "back"},
+                {"name": "◀️ Voltar ao menu principal", "value": "back"},
             ],
         ).execute()
         
@@ -293,7 +293,7 @@ def run_apigw_wizard(profile: str):
                 choices=[
                     {"name": "📋 Listar rotas", "value": "list"},
                     {"name": "➕ Criar nova rota", "value": "create"},
-                    {"name": "◀️  Voltar (escolher outra API)", "value": "back"},
+                    {"name": "◀️ Voltar (escolher outra API)", "value": "back"},
                     {"name": "❌ Sair", "value": "exit"},
                 ],
             ).execute()
