@@ -9,6 +9,7 @@ CLI interativa para automação de tarefas AWS com suporte a SSO.
 - 🖥️ **EC2 Manager** - Listar, iniciar, parar, reiniciar instâncias
 - 🏗️ **Service Catalog** - Provisionar produtos, gerenciar provisionados
 - 💰 **Cost & FinOps** - Resumo de custos e recomendações de recursos ociosos (RDS, EBS, ELB, etc)
+- 🪣 **S3 Browser** - Navegar em buckets, upload e download interativo
 - 🌐 **API Gateway** - Listar e criar rotas
 - 🎨 **Interface rica** - Tabelas coloridas, JSON highlighting
 
@@ -92,6 +93,9 @@ aws-tool sc status --pp-id ID        # Ver status detalhado
 # Cost & FinOps
 aws-tool cost                        # Modo interativo (Resumo, Top Services, Recomendações)
 aws-tool cost -p meu-profile         # Rodar direto em um profile
+
+# S3 Browser
+aws-tool s3                          # Navegador interativo
 
 
 # API Gateway

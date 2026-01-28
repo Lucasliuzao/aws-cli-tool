@@ -377,6 +377,15 @@ def run_cost_wizard(profile: str):
     interactive_cost_menu(ce_client, ec2_client, rds_client, elbv2_client)
 
 
+def run_s3_wizard(profile: str):
+    """Run the S3 Browser interactive wizard."""
+    from awscli_tool.commands.s3 import interactive_s3_browser
+    from awscli_tool.utils.aws_client import get_client
+    
+    s3_client = get_client("s3", profile)
+    interactive_s3_browser(s3_client)
+
+
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
@@ -417,6 +426,7 @@ def main(
             choices=[
                 {"name": "📦 ECS (Clusters, Services, Tasks, Logs)", "value": "ecs"},
                 {"name": "🖥️  EC2 (Instâncias)", "value": "ec2"},
+                {"name": "🪣 S3 Browser (Buckets/Files)", "value": "s3"},
                 {"name": "🏗️  Service Catalog (Products)", "value": "sc"},
                 {"name": "🌐 API Gateway (APIs, Rotas)", "value": "apigw"},
                 {"name": "💰 Cost & FinOps", "value": "cost"},
@@ -448,6 +458,11 @@ def main(
                 
         elif action == "cost":
             result = run_cost_wizard(selected_profile)
+            if result == "exit":
+                break
+                
+        elif action == "s3":
+            result = run_s3_wizard(selected_profile)
             if result == "exit":
                 break
                 
@@ -485,6 +500,9 @@ app.add_typer(apigateway.app, name="apigw", help="Comandos para API Gateway")
 
 from awscli_tool.commands import cost
 app.add_typer(cost.app, name="cost", help="Comandos para Cost Explorer e FinOps")
+
+from awscli_tool.commands import s3
+app.add_typer(s3.app, name="s3", help="Comandos para S3 Browser")
 
 
 @app.command("profiles")
