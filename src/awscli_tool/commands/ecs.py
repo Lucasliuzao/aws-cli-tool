@@ -34,7 +34,10 @@ def list_services(ecs_client, cluster: str) -> list[str]:
     services = []
     for page in paginator.paginate(cluster=cluster):
         services.extend(page["serviceArns"])
-    return [s.split("/")[-1] for s in services]
+    # Sort purely by service name (case incentive)
+    service_names = [s.split("/")[-1] for s in services]
+    service_names.sort(key=str.lower)
+    return service_names
 
 
 def get_service_details(ecs_client, cluster: str, service: str) -> dict:
@@ -485,13 +488,16 @@ def ecs_wizard(
             console.print(f"[yellow]⚠ Nenhum service encontrado no cluster {cluster}[/yellow]")
             continue
         
-        service_choices = services + ["◀️  Voltar"]
-        service = inquirer.select(
-            message="🔧 Selecione o service:",
+        service_choices = [{"name": s.split("/")[-1], "value": s.split("/")[-1]} for s in services]
+        service_choices.append({"name": "◀️  Voltar", "value": "back"})
+
+        service = inquirer.fuzzy(
+            message="🔧 Selecione o service (digite para filtrar):",
             choices=service_choices,
+            max_height="70%",
         ).execute()
-        
-        if service == "◀️  Voltar":
+
+        if service == "back":
             continue
         
         # Show interactive menu for this service
