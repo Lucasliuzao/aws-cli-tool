@@ -502,6 +502,10 @@ def ecs_wizard(
         if service == "back":
             continue
         
+        if not service:
+            console.print("[yellow]⚠ Nenhum serviço selecionado ou opção inválida.[/yellow]")
+            continue
+        
         # Show interactive menu for this service
         result = interactive_menu(ecs_client, logs_client, cluster, service, selected_profile)
         

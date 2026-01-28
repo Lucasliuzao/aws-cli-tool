@@ -589,6 +589,8 @@ def sc_wizard(
                 if result == "exit":
                     console.print("[dim]Até logo! 👋[/dim]")
                     break
+            else:
+                console.print("[yellow]⚠ Nenhum produto selecionado.[/yellow]")
             
         elif action == "launch":
             with Progress(
