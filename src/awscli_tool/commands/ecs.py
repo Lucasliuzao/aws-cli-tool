@@ -184,9 +184,14 @@ def view_logs_action(ecs_client, logs_client, cluster: str, service: str):
         ) as progress:
             progress.add_task("Buscando logs...", total=None)
             
+            # Calculate start time (1 hour ago) to get recent logs
+            import time
+            start_time = int((time.time() - 3600) * 1000)
+
+            # fetch without API limit to get full window (up to 10k), then slice tail
             response = logs_client.filter_log_events(
                 logGroupName=log_group,
-                limit=int(tail),
+                startTime=start_time,
                 interleaved=True,
             )
         
@@ -197,6 +202,11 @@ def view_logs_action(ecs_client, logs_client, cluster: str, service: str):
                 e for e in events
                 if level_filter in e.get("message", "").upper()
             ]
+            
+        # Apply tail locally
+        actual_tail = int(tail)
+        if len(events) > actual_tail:
+            events = events[-actual_tail:]
         
         display_logs(events, service, cluster)
         
@@ -636,15 +646,40 @@ def view_logs(
     # Wait, I overwrote them. 
     # I'll just assume: if I printed "📦 Cluster:" prompt, it's interactive.
     
-    console.print(f"\n[dim]Visualizando logs de {cluster}/{service}/{container_name}[/dim]")
+    # Calculate start time (default to 60 minutes ago to ensure we get recent logs)
+    # filter_log_events fetches from startTime onwards (oldest -> newest).
+    # If we don't set startTime, it fetches from creation (very old).
+    # If we set limit in API, it returns the OLDEST N logs from startTime.
+    # So strategy: 
+    # 1. Look back 60m. 
+    # 2. Fetch up to 10k logs (limit=None in API calls defaults to max page).
+    # 3. Slice the LAST N (tail) locally.
+    import time
+    start_time = int((time.time() - 3600) * 1000) # 1 hour ago in ms
 
-    response = logs_client.filter_log_events(logGroupName=log_group, limit=tail, interleaved=True)
-    events = response.get("events", [])
-    
-    if filter_level:
-        events = [e for e in events if filter_level.upper() in e.get("message", "").upper()]
-    
-    display_logs(events, service, cluster)
+    console.print(f"\n[dim]Visualizando logs de {cluster}/{service}/{container_name} (última 1h)[/dim]")
+
+    try:
+        # Don't pass 'limit' to API to avoid getting only the oldest logs of the window
+        response = logs_client.filter_log_events(
+            logGroupName=log_group, 
+            startTime=start_time,
+            interleaved=True
+        )
+        events = response.get("events", [])
+        
+        # Filter by level content
+        if filter_level:
+            events = [e for e in events if filter_level.upper() in e.get("message", "").upper()]
+            
+        # Apply tail locally
+        if len(events) > tail:
+            events = events[-tail:]
+        
+        display_logs(events, service, cluster)
+        
+    except Exception as e:
+        console.print(f"[red]❌ Erro ao buscar logs: {e}[/red]")
 
 
 @app.command("force-task")
