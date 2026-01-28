@@ -5,7 +5,7 @@ CLI interativa para automação de tarefas AWS com suporte a SSO.
 ## Features
 
 - 🔐 **Seletor de profiles SSO** - Menu interativo para escolher entre seus profiles
-- 📦 **ECS Manager** - Ver logs, tasks, forçar deploys
+- 📦 **ECS Manager** - Ver logs, tasks, forçar deploys, **Shell no Container**
 - 🖥️ **EC2 Manager** - Listar, iniciar, parar, reiniciar instâncias
 - 🏗️ **Service Catalog** - Provisionar produtos, gerenciar provisionados
 - 💰 **Cost & FinOps** - Resumo de custos e recomendações de recursos ociosos (RDS, EBS, ELB, etc)
@@ -73,6 +73,8 @@ aws-tool ecs
 # ECS - comandos diretos
 aws-tool ecs logs --cluster meu-cluster --service meu-service
 aws-tool ecs force-task -c meu-cluster -s meu-service -y
+# Para shell interativo, use o modo wizard: aws-tool ecs
+
 
 # EC2
 aws-tool ec2                         # Modo interativo

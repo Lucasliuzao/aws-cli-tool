@@ -2,6 +2,8 @@
 
 from typing import Optional
 
+import shutil
+import subprocess
 import typer
 from InquirerPy import inquirer
 from rich.console import Console
@@ -291,7 +293,73 @@ def force_task_action(ecs_client, cluster: str, service: str):
         console.print(f"[red]❌ Erro ao forçar deploy: {e}[/red]")
 
 
-def interactive_menu(ecs_client, logs_client, cluster: str, service: str):
+
+def check_session_manager_plugin() -> bool:
+    """Check if session-manager-plugin is installed."""
+    return shutil.which("session-manager-plugin") is not None
+
+
+def execute_command_action(ecs_client, cluster: str, service: str, profile: str):
+    """Start interactive shell session in a container."""
+    if not check_session_manager_plugin():
+        console.print(Panel(
+            "[red]❌ Session Manager Plugin não encontrado![/red]\n\n"
+            "Para usar o ECS Exec, você precisa instalar o plugin:\n"
+            "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html",
+            border_style="red"
+        ))
+        return
+
+    # Get running tasks
+    tasks = get_tasks(ecs_client, cluster, service)
+    running_tasks = [t for t in tasks if t["lastStatus"] == "RUNNING"]
+    
+    if not running_tasks:
+        console.print("[yellow]⚠ Nenhuma task rodando para conectar.[/yellow]")
+        return
+        
+    # Select task if multiple
+    task_arn = running_tasks[0]["taskArn"]
+    if len(running_tasks) > 1:
+        choices = [
+            {"name": f"{t['taskArn'].split('/')[-1]} ({t.get('healthStatus', 'UNKNOWN')})", "value": t["taskArn"]}
+            for t in running_tasks
+        ]
+        task_arn = inquirer.select(message="Selecione a task:", choices=choices).execute()
+        
+    # Select container if multiple (in the selected task)
+    selected_task = next(t for t in running_tasks if t["taskArn"] == task_arn)
+    containers = selected_task.get("containers", [])
+    container_name = containers[0]["name"]
+    
+    if len(containers) > 1:
+        choices = [{"name": c["name"], "value": c["name"]} for c in containers]
+        container_name = inquirer.select(message="Selecione o container:", choices=choices).execute()
+
+    console.print(f"\n[green]🚀 Conectando em {container_name}...[/green]")
+    console.print("[dim]Pressione Ctrl-D ou digite 'exit' para sair.[/dim]\n")
+    
+    # Build AWS CLI command
+    # We use subprocess to call the system's AWS CLI because we need a real interactive TTY
+    cmd = [
+        "aws", "ecs", "execute-command",
+        "--cluster", cluster,
+        "--task", task_arn,
+        "--container", container_name,
+        "--command", "/bin/sh",
+        "--interactive"
+    ]
+    
+    if profile:
+        cmd.extend(["--profile", profile])
+        
+    try:
+        subprocess.call(cmd)
+    except Exception as e:
+        console.print(f"[red]Erro ao executar comando: {e}[/red]")
+
+
+def interactive_menu(ecs_client, logs_client, cluster: str, service: str, profile: str = None):
     """Show interactive action menu for a service."""
     while True:
         # Get fresh service info
@@ -309,6 +377,7 @@ def interactive_menu(ecs_client, logs_client, cluster: str, service: str):
         
         # Build action choices based on current state
         actions = [
+            {"name": "💻 Conectar no Container (Shell)", "value": "exec"},
             {"name": "📋 Ver Logs", "value": "logs"},
             {"name": "🔍 Ver Tasks em detalhe", "value": "tasks"},
             {"name": "🚀 Forçar nova Task (deploy)", "value": "force"},
@@ -326,7 +395,9 @@ def interactive_menu(ecs_client, logs_client, cluster: str, service: str):
             choices=actions,
         ).execute()
         
-        if action == "logs":
+        if action == "exec":
+            execute_command_action(ecs_client, cluster, service, profile)
+        elif action == "logs":
             view_logs_action(ecs_client, logs_client, cluster, service)
         elif action == "tasks":
             view_tasks_action(ecs_client, cluster, service)
@@ -424,7 +495,7 @@ def ecs_wizard(
             continue
         
         # Show interactive menu for this service
-        result = interactive_menu(ecs_client, logs_client, cluster, service)
+        result = interactive_menu(ecs_client, logs_client, cluster, service, selected_profile)
         
         if result == "exit":
             console.print("[dim]Até logo! 👋[/dim]")

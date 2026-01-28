@@ -75,7 +75,7 @@ def run_ecs_wizard(profile: str):
             continue
         
         # Show interactive menu
-        result = interactive_menu(ecs_client, logs_client, cluster, service)
+        result = interactive_menu(ecs_client, logs_client, cluster, service, profile)
         
         if result == "exit":
             return "exit"
