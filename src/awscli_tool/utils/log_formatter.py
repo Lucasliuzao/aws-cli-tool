@@ -101,9 +101,14 @@ def format_log_entry(event: dict, show_json: bool = True) -> dict:
         level = json_data["level"].upper()
     
     # Clean message for display
-    clean_message = message.strip()
-    if len(clean_message) > 200 and not json_data:
-        clean_message = clean_message[:200] + "..."
+    # Strip ANSI codes for clean display in Rich
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    clean_message = ansi_escape.sub('', message).strip()
+    
+    # Do NOT truncate heavily here, let Rich table handle folding.
+    # We only truncate if it's absurdly long to prevent memory issues, e.g. 5000 chars.
+    if len(clean_message) > 5000 and not json_data:
+        clean_message = clean_message[:5000] + "..."
     
     return {
         "timestamp": timestamp,
