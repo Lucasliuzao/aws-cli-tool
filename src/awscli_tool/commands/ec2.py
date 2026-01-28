@@ -294,14 +294,14 @@ def interactive_menu(ec2_client, instance: dict):
         actions = []
         
         if state == "stopped":
-            actions.append({"name": "▶️  Iniciar instância", "value": "start"})
+            actions.append({"name": "▶️ Iniciar instância", "value": "start"})
         elif state == "running":
-            actions.append({"name": "⏹️  Parar instância", "value": "stop"})
+            actions.append({"name": "⏹️ Parar instância", "value": "stop"})
             actions.append({"name": "🔄 Reiniciar instância", "value": "reboot"})
         
         actions.extend([
             {"name": "🔃 Atualizar informações", "value": "refresh"},
-            {"name": "◀️  Voltar (escolher outra instância)", "value": "back"},
+            {"name": "◀️ Voltar (escolher outra instância)", "value": "back"},
             {"name": "❌ Sair", "value": "exit"},
         ])
         
