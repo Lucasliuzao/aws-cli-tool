@@ -171,9 +171,9 @@ def interactive_cost_menu(ce_client, ec2_client, rds_client, elbv2_client):
         action = inquirer.select(
             message="O que deseja ver?",
             choices=[
-                {"name": "📊 Resumo de Custos (Mês Atual)", "value": "summary"},
-                {"name": "🔝 Top Serviços (Gastos)", "value": "top_services"},
-                {"name": "💡 Recomendações FinOps (Recursos Ociosos)", "value": "recommendations"},
+                {"name": "📊  Resumo de Custos (Mês Atual)", "value": "summary"},
+                {"name": "🔝  Top Serviços (Gastos)", "value": "top_services"},
+                {"name": "💡  Recomendações FinOps (Recursos Ociosos)", "value": "recommendations"},
                 {"name": "◀️  Voltar", "value": "back"},
             ],
         ).execute()

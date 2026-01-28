@@ -424,15 +424,15 @@ def main(
         action = inquirer.select(
             message="🎯 O que deseja gerenciar?",
             choices=[
-                {"name": "📦 ECS (Clusters, Services, Tasks, Logs)", "value": "ecs"},
+                {"name": "📦  ECS (Clusters, Services, Tasks, Logs)", "value": "ecs"},
                 {"name": "🖥️  EC2 (Instâncias)", "value": "ec2"},
-                {"name": "🪣 S3 Browser (Buckets/Files)", "value": "s3"},
+                {"name": "🪣  S3 Browser (Buckets/Files)", "value": "s3"},
                 {"name": "🏗️  Service Catalog (Products)", "value": "sc"},
-                {"name": "🌐 API Gateway (APIs, Rotas)", "value": "apigw"},
-                {"name": "💰 Cost & FinOps", "value": "cost"},
-                {"name": "📋 Ver profiles configurados", "value": "profiles"},
-                {"name": "🔄 Trocar profile", "value": "switch"},
-                {"name": "❌ Sair", "value": "exit"},
+                {"name": "🌐  API Gateway (APIs, Rotas)", "value": "apigw"},
+                {"name": "💰  Cost & FinOps", "value": "cost"},
+                {"name": "📋  Ver profiles configurados", "value": "profiles"},
+                {"name": "🔄  Trocar profile", "value": "switch"},
+                {"name": "❌  Sair", "value": "exit"},
             ],
         ).execute()
         
