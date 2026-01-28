@@ -313,7 +313,7 @@ def interactive_menu(ecs_client, logs_client, cluster: str, service: str):
             {"name": "🔍 Ver Tasks em detalhe", "value": "tasks"},
             {"name": "🚀 Forçar nova Task (deploy)", "value": "force"},
             {"name": "🔄 Atualizar informações", "value": "refresh"},
-            {"name": "◀️  Voltar (escolher outro service)", "value": "back"},
+            {"name": "◀️ Voltar (escolher outro service)", "value": "back"},
             {"name": "❌ Sair", "value": "exit"},
         ]
         
