@@ -54,6 +54,77 @@ def list_integrations(apigw_client, api_id: str) -> list[dict]:
     return integrations
 
 
+def list_authorizers(apigw_client, api_id: str) -> list[dict]:
+    """List all authorizers for an API."""
+    authorizers = []
+    try:
+        response = apigw_client.get_authorizers(ApiId=api_id)
+        authorizers = response.get("Items", [])
+    except Exception as e:
+        console.print(f"[red]Erro ao listar authorizers: {e}[/red]")
+    return authorizers
+
+
+def create_integration_interactive(apigw_client, api_id: str) -> Optional[str]:
+    """Create a new integration interactively."""
+    console.print(Panel("🛠️  Criação de Nova Integração", style="cyan"))
+    
+    # Select integration type
+    type_choices = [
+        {"name": "AWS Lambda (AWS_PROXY)", "value": "AWS_PROXY"},
+        {"name": "HTTP URL (HTTP_PROXY)", "value": "HTTP_PROXY"},
+    ]
+    
+    integration_type = inquirer.select(
+        message="Selecione o tipo de integração:",
+        choices=type_choices,
+    ).execute()
+    
+    payload_format_version = "2.0"  # Standard for HTTP APIs
+    integration_method = "POST" # Usually POST for Lambda and HTTP Proxy
+    integration_uri = None
+    
+    if integration_type == "AWS_PROXY":
+        integration_uri = inquirer.text(
+            message="Arn da Lambda:",
+            instruction="(ex: arn:aws:lambda:us-east-1:123456789012:function:my-function)",
+        ).execute()
+        if not integration_uri:
+            return None
+            
+    elif integration_type == "HTTP_PROXY":
+        integration_method = inquirer.select(
+            message="Método HTTP da integração:",
+            choices=HTTP_METHODS,
+            default="GET",
+        ).execute()
+        
+        integration_uri = inquirer.text(
+            message="URL de destino:",
+            instruction="(ex: https://api.example.com/users)",
+        ).execute()
+        if not integration_uri:
+            return None
+    
+    # Confirm creation
+    console.print(f"[dim]Criando integração '{integration_type}' -> '{integration_uri}'...[/dim]")
+    
+    try:
+        response = apigw_client.create_integration(
+            ApiId=api_id,
+            IntegrationType=integration_type,
+            IntegrationUri=integration_uri,
+            PayloadFormatVersion=payload_format_version,
+            IntegrationMethod=integration_method,
+        )
+        integration_id = response["IntegrationId"]
+        console.print(f"[green]✓ Integração criada: {integration_id}[/green]")
+        return integration_id
+    except Exception as e:
+        console.print(f"[red]Erro ao criar integração: {e}[/red]")
+        return None
+
+
 def select_api(apigw_client, api_id: Optional[str] = None) -> dict:
     """Select API interactively or validate provided ID."""
     apis = list_apis(apigw_client)
@@ -195,6 +266,48 @@ def create_route(
         progress.add_task("Carregando APIs...", total=None)
         api = select_api(apigw_client, api_id)
     
+    # Authorization Selection
+    auth_type = "NONE"
+    authorizer_id = None
+    
+    auth_choices = [
+        {"name": "🔓 NONE (Público)", "value": "NONE"},
+        {"name": "🛡️  AWS_IAM", "value": "AWS_IAM"},
+        {"name": "🔑 CUSTOM / JWT / USER_POOLS (Selecionar Authorizer)", "value": "CUSTOM"},
+    ]
+    
+    selected_auth_mode = inquirer.select(
+        message="🔒 Configuração de Autorização:",
+        choices=auth_choices,
+    ).execute()
+    
+    if selected_auth_mode == "CUSTOM":
+        with Progress(
+             SpinnerColumn(),
+             TextColumn("[progress.description]{task.description}"),
+             console=console,
+        ) as progress:
+            progress.add_task("Carregando Authorizers...", total=None)
+            authorizers = list_authorizers(apigw_client, api["ApiId"])
+        
+        if not authorizers:
+            console.print("[yellow]⚠ Nenhum Authorizer encontrado nesta API. Usando NONE.[/yellow]")
+            auth_type = "NONE"
+        else:
+            auth_choices = [
+                {"name": f"{auth['Name']} ({auth['AuthorizerType']})", "value": auth}
+                for auth in authorizers
+            ]
+            selected_authorizer = inquirer.select(
+                message="Selecione o Authorizer:",
+                choices=auth_choices,
+            ).execute()
+            
+            auth_type = selected_authorizer["AuthorizerType"] # JWT or CUSTOM
+            authorizer_id = selected_authorizer["AuthorizerId"]
+    else:
+        auth_type = selected_auth_mode
+
     # Select integration if not provided
     if not integration_id:
         with Progress(
@@ -205,6 +318,7 @@ def create_route(
             progress.add_task("Carregando integrações...", total=None)
             integrations = list_integrations(apigw_client, api["ApiId"])
         
+        choices = []
         if integrations:
             choices = [
                 {
@@ -213,12 +327,25 @@ def create_route(
                 }
                 for integ in integrations
             ]
-            choices.append({"name": "❌ Nenhuma (criar rota sem integração)", "value": None})
-            
-            integration_id = inquirer.select(
-                message="🔗 Selecione a integração:",
-                choices=choices,
-            ).execute()
+        
+        # Add option to create new integration
+        choices.insert(0, {"name": "➕ Criar nova integração agora", "value": "CREATE_NEW"})
+        choices.append({"name": "❌ Nenhuma (criar rota sem integração)", "value": None})
+        
+        selection = inquirer.select(
+            message="🔗 Selecione a integração:",
+            choices=choices,
+        ).execute()
+        
+        if selection == "CREATE_NEW":
+            created_id = create_integration_interactive(apigw_client, api["ApiId"])
+            if created_id:
+                integration_id = created_id
+            else:
+                console.print("[yellow]⚠ Falha ao criar integração. Prosseguindo sem integração.[/yellow]")
+                integration_id = None
+        else:
+            integration_id = selection
     
     # Confirm
     route_key = f"{method} {path}"
@@ -226,6 +353,8 @@ def create_route(
         f"[cyan]Nova rota:[/cyan]\n\n"
         f"  API: [green]{api['Name']}[/green] ({api['ApiId']})\n"
         f"  Route Key: [green]{route_key}[/green]\n"
+        f"  Auth Type: [green]{auth_type}[/green]\n"
+        f"  Authorizer ID: [green]{authorizer_id or 'N/A'}[/green]\n"
         f"  Integration: [green]{integration_id or 'Nenhuma'}[/green]",
         title="Confirmação",
         border_style="cyan",
@@ -256,6 +385,11 @@ def create_route(
             
             if integration_id:
                 kwargs["Target"] = f"integrations/{integration_id}"
+
+            if auth_type != "NONE":
+                kwargs["AuthorizationType"] = auth_type
+                if authorizer_id:
+                    kwargs["AuthorizerId"] = authorizer_id
             
             response = apigw_client.create_route(**kwargs)
         
