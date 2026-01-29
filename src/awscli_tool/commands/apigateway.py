@@ -170,6 +170,10 @@ def create_route(
         console.print(f"[dim]Métodos válidos: {', '.join(HTTP_METHODS)}[/dim]")
         raise typer.Exit(1)
     
+    # Ensure path starts with /
+    if not path.startswith("/"):
+        path = f"/{path}"
+    
     # Select profile
     selected_profile = select_profile(profile)
     if not selected_profile:
